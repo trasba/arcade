@@ -2,15 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Connect Four</title>
     <style>
         :root {
+            /* Using vmin ensures the game scales to the smaller of the viewport's width or height,
+               making it workable in portrait mode. */
+            --cell-size: 10vmin;
             --board-bg: #003366;
-            --cell-size: 8vmin;
             --p1-color: #ff4136; /* Red */
             --p2-color: #ffdc00; /* Yellow */
-            --font-color: #333;
             --bg-color: #f4f4f4;
         }
 
@@ -18,7 +19,6 @@
             margin: 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
-            color: var(--font-color);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -28,14 +28,13 @@
 
         h1 {
             font-size: 2.5rem;
-            margin-bottom: 0.5rem;
             color: var(--board-bg);
         }
 
         #gameStatus {
             font-size: 1.5rem;
             margin-bottom: 1rem;
-            min-height: 2rem; /* Prevents layout shift */
+            min-height: 2rem;
             font-weight: 500;
         }
 
@@ -48,22 +47,31 @@
             position: absolute;
             width: 100%;
             top: 0;
+            height: calc(var(--cell-size) * 6); /* Cover the whole board height */
         }
 
         .selector {
-            height: var(--cell-size);
             flex-grow: 1;
             cursor: pointer;
-            border-bottom: 5px solid transparent;
-            transition: border-color 0.2s ease;
+            position: relative;
         }
         
-        .selector:hover {
-            border-bottom-color: var(--p1-color);
+        /* The hover effect uses a pseudo-element */
+        .selector:hover::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(var(--cell-size) * 0.8);
+            height: calc(var(--cell-size) * 0.8);
+            border-radius: 50%;
+            background-color: var(--p1-color);
+            opacity: 0.5;
         }
         
-        body.player-2 .selector:hover {
-             border-bottom-color: var(--p2-color);
+        body.player-2 .selector:hover::after {
+             background-color: var(--p2-color);
         }
 
         #gameBoard {
@@ -75,8 +83,6 @@
             padding: 10px;
             border-radius: 15px;
             box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-            position: relative;
-            z-index: -1;
         }
 
         .cell {
@@ -118,12 +124,6 @@
             background-color: var(--board-bg);
             color: white;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        #restartBtn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
         }
 
     </style>
@@ -152,10 +152,32 @@
         let boardState;
         let currentPlayer;
         let gameActive;
+        let gameStarted = false; // NEW: Flag to track the first click
 
         // --- Functions ---
         
+        /**
+         * NEW: This function requests fullscreen and locks orientation.
+         */
+        async function initiateGameSession() {
+            try {
+                await document.documentElement.requestFullscreen();
+                await screen.orientation.lock('portrait');
+            } catch (err) {
+                console.warn("Could not enter fullscreen or lock orientation:", err);
+            }
+        }
+        
+        /**
+         * MODIFIED: Now checks for the first click to initiate the game session.
+         */
         function handleColumnClick(colIndex) {
+            // If the game hasn't been "activated" by a first click yet...
+            if (!gameStarted) {
+                gameStarted = true;
+                initiateGameSession();
+            }
+
             if (!gameActive) return;
 
             // Find the first empty row in the column from the bottom
@@ -167,20 +189,14 @@
                 }
             }
 
-            if (rowIndex === -1) {
-                // Column is full
-                return;
-            }
+            if (rowIndex === -1) return; // Column is full
             
-            // Update state
             boardState[rowIndex][colIndex] = currentPlayer;
 
-            // Update UI
             const cell = document.querySelector(`.cell[data-row='${rowIndex}'][data-col='${colIndex}']`);
             cell.classList.add(`player-${currentPlayer}`);
             cell.querySelector('.piece').classList.add('dropped');
 
-            // Check for win
             if (checkForWin(rowIndex, colIndex)) {
                 gameActive = false;
                 statusElement.textContent = `Player ${currentPlayer} wins! 🎉`;
@@ -188,53 +204,36 @@
                 return;
             }
             
-            // Check for draw
             if (boardState[0].every(cell => cell !== 0)) {
                 gameActive = false;
                 statusElement.textContent = `It's a draw! 🤝`;
                 return;
             }
 
-            // Switch player
             switchPlayer();
         }
 
         function checkForWin(r, c) {
             const player = boardState[r][c];
-            
-            // Check in all 4 directions (Horizontal, Vertical, 2 Diagonals)
             const directions = [
-                { r: 0, c: 1 },  // Horizontal
-                { r: 1, c: 0 },  // Vertical
-                { r: 1, c: 1 },  // Diagonal \
-                { r: 1, c: -1 }  // Diagonal /
+                { r: 0, c: 1 }, { r: 1, c: 0 },
+                { r: 1, c: 1 }, { r: 1, c: -1 }
             ];
 
             for (const dir of directions) {
-                let count = 1; // Count the piece just placed
-                
-                // Count in the positive direction
+                let count = 1;
                 for (let i = 1; i < 4; i++) {
                     const newR = r + dir.r * i;
                     const newC = c + dir.c * i;
-                    if (newR >= 0 && newR < ROWS && newC >= 0 && newC < COLS && boardState[newR][newC] === player) {
-                        count++;
-                    } else {
-                        break;
-                    }
+                    if (newR >= 0 && newR < ROWS && newC >= 0 && newC < COLS && boardState[newR][newC] === player) count++;
+                    else break;
                 }
-                
-                // Count in the negative direction
                 for (let i = 1; i < 4; i++) {
                     const newR = r - dir.r * i;
                     const newC = c - dir.c * i;
-                    if (newR >= 0 && newR < ROWS && newC >= 0 && newC < COLS && boardState[newR][newC] === player) {
-                        count++;
-                    } else {
-                        break;
-                    }
+                    if (newR >= 0 && newR < ROWS && newC >= 0 && newC < COLS && boardState[newR][newC] === player) count++;
+                    else break;
                 }
-
                 if (count >= 4) return true;
             }
             return false;
@@ -246,20 +245,21 @@
             document.body.classList.add(`player-${currentPlayer}`);
             statusElement.textContent = `Player ${currentPlayer}'s Turn`;
         }
-
+        
+        /**
+         * MODIFIED: Resets the gameStarted flag.
+         */
         function initializeGame() {
-            // Reset state
             boardState = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
             currentPlayer = 1;
             gameActive = true;
+            gameStarted = false; // Reset the first-click flag
 
-            // Reset UI
             boardElement.innerHTML = '';
             selectorsElement.innerHTML = '';
             statusElement.textContent = `Player ${currentPlayer}'s Turn`;
             document.body.className = 'player-1';
 
-            // Create board and selectors
             for (let c = 0; c < COLS; c++) {
                 const selector = document.createElement('div');
                 selector.classList.add('selector');

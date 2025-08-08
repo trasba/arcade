@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Tic-Tac-Toe</title>
     <style>
         :root {
@@ -118,6 +118,7 @@
         let gameActive = true;
         let currentPlayer = 'X';
         let gameState = ["", "", "", "", "", "", "", "", ""];
+        let gameStarted = false; // Flag to track the first click
 
         const winningConditions = [
             [0, 1, 2],
@@ -131,7 +132,20 @@
         ];
 
         // --- Functions ---
-
+        
+        /**
+         * NEW: This function requests fullscreen and locks orientation.
+         * It's called only on the first user interaction.
+         */
+        async function initiateGameSession() {
+            try {
+                await document.documentElement.requestFullscreen();
+                await screen.orientation.lock('portrait');
+            } catch (err) {
+                console.warn("Could not enter fullscreen or lock orientation:", err);
+            }
+        }
+        
         function handlePlayerChange() {
             currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
             gameStatusDisplay.textContent = `It's ${currentPlayer}'s turn`;
@@ -169,7 +183,16 @@
             handlePlayerChange();
         }
 
+        /**
+         * MODIFIED: Now checks for the first click to initiate the game session.
+         */
         function handleCellClick(event) {
+            // If the game hasn't been "activated" by a first click yet...
+            if (!gameStarted) {
+                gameStarted = true;      // Set the flag so this only runs once per game
+                initiateGameSession(); // Call the function to request screen lock
+            }
+
             const clickedCell = event.target;
             const clickedCellIndex = parseInt(clickedCell.getAttribute('data-cell-index'));
 
@@ -185,10 +208,15 @@
             handleResultValidation();
         }
 
+        /**
+         * MODIFIED: Resets the gameStarted flag so the lock can be re-triggered
+         * after a restart.
+         */
         function handleRestartGame() {
             gameActive = true;
             currentPlayer = 'X';
             gameState = ["", "", "", "", "", "", "", "", ""];
+            gameStarted = false; // Reset the first-click flag
             gameStatusDisplay.textContent = `It's ${currentPlayer}'s turn`;
             document.querySelectorAll('.cell').forEach(cell => {
                 cell.textContent = '';

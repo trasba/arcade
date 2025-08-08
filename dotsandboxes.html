@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Dots and Boxes</title>
     <style>
         :root {
             --grid-size: 3; /* Must match the JS constant */
-            --cell-size: 20px;
-            --box-size: 80px;
+            /* MODIFIED: Using vmin for a responsive board */
+            --box-size: 20vmin;
+            --cell-size: 5vmin;
             --p1-color: #e57373;
             --p1-color-light: #ffcdd2;
             --p2-color: #64b5f6;
@@ -88,6 +89,17 @@
             min-height: 2rem;
             color: #333;
         }
+        
+        #restartBtn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 8px;
+            background-color: #555;
+            color: white;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -98,21 +110,73 @@
     </div>
     <div id="gameBoard"></div>
     <div id="gameStatus"></div>
+    <button id="restartBtn">Restart Game</button>
 
     <script>
-        const GRID_SIZE = 3; // Number of boxes per row/column
+        const GRID_SIZE = 3; 
 
         // --- DOM Elements ---
         const boardElement = document.getElementById('gameBoard');
         const p1ScoreElement = document.getElementById('p1Score');
         const p2ScoreElement = document.getElementById('p2Score');
         const statusElement = document.getElementById('gameStatus');
+        const restartBtn = document.getElementById('restartBtn');
 
         // --- Game State ---
         let lines, boxes, currentPlayer, playerScores, gameActive;
+        let gameStarted = false; // NEW: Flag to track first user interaction
 
+        // --- Functions ---
+        
+        /**
+         * NEW: This function requests fullscreen and locks orientation.
+         */
+        async function initiateGameSession() {
+            try {
+                await document.documentElement.requestFullscreen();
+                await screen.orientation.lock('portrait');
+            } catch (err) {
+                console.warn("Could not enter fullscreen or lock orientation:", err);
+            }
+        }
+        
+        /**
+         * MODIFIED: Now checks for the first click to initiate the game session.
+         */
+        function handleLineClick(event) {
+            if (!gameStarted) {
+                gameStarted = true;
+                initiateGameSession();
+            }
+            
+            if (!gameActive) return;
+            const line = event.target;
+            if (line.classList.contains('claimed')) return;
+
+            const row = parseInt(line.dataset.row);
+            const col = parseInt(line.dataset.col);
+            const isHorizontal = line.classList.contains('horizontal');
+
+            line.classList.add('claimed', `player-${currentPlayer}`);
+            if (isHorizontal) {
+                lines.horizontal[row][col] = currentPlayer;
+            } else {
+                lines.vertical[row][col] = currentPlayer;
+            }
+
+            const boxesCompleted = checkBoxes(row, col, isHorizontal);
+            
+            if (boxesCompleted > 0) {
+                playerScores[currentPlayer] += boxesCompleted;
+                updateScores();
+                if (checkForGameOver()) return; // Stop if game is over
+                // Player goes again if a box was completed
+            } else {
+                switchPlayer();
+            }
+        }
+        
         function initializeGame() {
-            // Reset state
             lines = {
                 horizontal: Array(GRID_SIZE + 1).fill(null).map(() => Array(GRID_SIZE).fill(0)),
                 vertical: Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE + 1).fill(0))
@@ -121,13 +185,13 @@
             playerScores = { 1: 0, 2: 0 };
             currentPlayer = 1;
             gameActive = true;
+            gameStarted = false; // MODIFIED: Reset the first-click flag
             
             boardElement.innerHTML = '';
             statusElement.textContent = '';
             document.body.className = 'player-1';
             updateScores();
 
-            // Create the grid in the DOM
             for (let r = 0; r < GRID_SIZE * 2 + 1; r++) {
                 for (let c = 0; c < GRID_SIZE * 2 + 1; c++) {
                     const element = document.createElement('div');
@@ -147,7 +211,7 @@
                         element.dataset.row = (r - 1) / 2;
                         element.dataset.col = c / 2;
                         element.addEventListener('click', handleLineClick);
-                    } else { // It's a box
+                    } else {
                         element.classList.add('box');
                         element.dataset.row = (r - 1) / 2;
                         element.dataset.col = (c - 1) / 2;
@@ -156,64 +220,23 @@
                 }
             }
         }
-
-        function handleLineClick(event) {
-            if (!gameActive) return;
-            const line = event.target;
-            if (line.classList.contains('claimed')) return;
-
-            const row = parseInt(line.dataset.row);
-            const col = parseInt(line.dataset.col);
-            const isHorizontal = line.classList.contains('horizontal');
-
-            // Update state and UI
-            line.classList.add('claimed', `player-${currentPlayer}`);
-            if (isHorizontal) {
-                lines.horizontal[row][col] = currentPlayer;
-            } else {
-                lines.vertical[row][col] = currentPlayer;
-            }
-
-            const boxesCompleted = checkBoxes(row, col, isHorizontal);
-            
-            if (boxesCompleted > 0) {
-                playerScores[currentPlayer] += boxesCompleted;
-                updateScores();
-                checkForGameOver();
-                // Player goes again
-            } else {
-                switchPlayer();
-            }
-        }
-
+        
         function checkBoxes(row, col, isHorizontal) {
             let completedCount = 0;
-            
             if (isHorizontal) {
-                // Check box above
-                if (row > 0 && checkBox(row - 1, col)) completedCount++;
-                // Check box below
-                if (row < GRID_SIZE && checkBox(row, col)) completedCount++;
-            } else { // Vertical
-                // Check box to the left
-                if (col > 0 && checkBox(row, col - 1)) completedCount++;
-                // Check box to the right
-                if (col < GRID_SIZE && checkBox(row, col)) completedCount++;
+                if (row > 0 && isBoxComplete(row - 1, col)) completedCount++;
+                if (row < GRID_SIZE && isBoxComplete(row, col)) completedCount++;
+            } else {
+                if (col > 0 && isBoxComplete(row, col - 1)) completedCount++;
+                if (col < GRID_SIZE && isBoxComplete(row, col)) completedCount++;
             }
             return completedCount;
         }
 
-        function checkBox(r, c) {
-            // Check if a box is already claimed
+        function isBoxComplete(r, c) {
             if (boxes[r][c] !== 0) return false;
             
-            // Check if all 4 surrounding lines are claimed
-            const top = lines.horizontal[r][c];
-            const bottom = lines.horizontal[r + 1][c];
-            const left = lines.vertical[r][c];
-            const right = lines.vertical[r][c + 1];
-
-            if (top && bottom && left && right) {
+            if (lines.horizontal[r][c] && lines.horizontal[r + 1][c] && lines.vertical[r][c] && lines.vertical[r][c + 1]) {
                 boxes[r][c] = currentPlayer;
                 const boxElement = document.querySelector(`.box[data-row='${r}'][data-col='${c}']`);
                 boxElement.classList.add(`player-${currentPlayer}`);
@@ -244,10 +267,13 @@
                 } else {
                     statusElement.textContent = "It's a Draw! 🤝";
                 }
+                return true; // Game is over
             }
+            return false; // Game is not over
         }
 
-        // --- Start Game ---
+        // --- Event Listeners and Initial Call ---
+        restartBtn.addEventListener('click', initializeGame);
         initializeGame();
     </script>
 </body>
