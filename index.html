@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Web Arcade</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
+        :root {
+            --bg-color: #f4f7f9;
+            --font-color: #333;
+            --card-bg: #ffffff;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --accent-color: #007bff;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--font-color);
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 600;
+            color: var(--accent-color);
+        }
+        
+        h1 span {
+            font-size: 5rem;
+            vertical-align: middle;
+            line-height: 1;
+        }
+
+        #game-grid {
+            display: grid;
+            /* This creates a responsive grid that adjusts columns automatically */
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .game-card {
+            background-color: var(--card-bg);
+            border-radius: 15px;
+            box-shadow: 0 4px 15px var(--shadow-color);
+            text-decoration: none;
+            color: var(--font-color);
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .game-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .game-card h2 {
+            font-size: 1.8rem;
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+        }
+
+        .game-card p {
+            font-size: 1rem;
+            line-height: 1.5;
+            flex-grow: 1; /* Ensures cards have the same height if descriptions vary */
+        }
+        
+        .game-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1><span>🎮</span> Simple Web Arcade</h1>
+    </header>
+
+    <main id="game-grid">
+        <a href="tictactoe.html" class="game-card">
+            <div class="game-icon">✏️</div>
+            <h2>Tic-Tac-Toe</h2>
+            <p>The classic two-player game of X's and O's. Simple, strategic, and timeless.</p>
+        </a>
+
+        <a href="connectfour.html" class="game-card">
+            <div class="game-icon">🔴</div>
+            <h2>Connect Four</h2>
+            <p>Drop your discs and be the first to get four in a row—horizontally, vertically, or diagonally.</p>
+        </a>
+
+        <a href="minesweeper.html" class="game-card">
+            <div class="game-icon">💣</div>
+            <h2>Minesweeper</h2>
+            <p>A single-player logic puzzle. Use numeric clues to locate all the hidden mines without setting one off.</p>
+        </a>
+
+        <a href="dotsandboxes.html" class="game-card">
+            <div class="game-icon">🖼️</div>
+            <h2>Dots and Boxes</h2>
+            <p>Claim lines to complete boxes. A simple game of territory and tactics where every box counts.</p>
+        </a>
+
+    </main>
+
+</body>
+</html>

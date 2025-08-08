@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fullscreen Canvas Example</title>
+    <style>
+        /* Basic styles to center content */
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #1a1a1a;
+            color: #f0f0f0;
+            font-family: sans-serif;
+        }
+
+        /* Initial canvas style */
+        canvas {
+            background-color: #000;
+            border: 2px solid #444;
+            display: block; /* Removes bottom margin */
+        }
+
+        /* Style for the canvas WHEN it is in fullscreen mode */
+        canvas:fullscreen {
+            border: none; /* No border in fullscreen */
+        }
+        
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+    <button id="fullscreenBtn">Go Fullscreen 🚀</button>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+        // --- 1. GAME STATE ---
+        // A simple bouncing ball
+        let ball = {
+            x: 100,
+            y: 100,
+            radius: 25,
+            dx: 4, // speed in x direction
+            dy: 5, // speed in y direction
+            color: '#0095DD'
+        };
+
+        // --- 2. FULLSCREEN LOGIC ---
+        function openFullscreen(elem) {
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) { /* Safari */
+                elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) { /* IE11 */
+                elem.msRequestFullscreen();
+            }
+        }
+
+        fullscreenBtn.addEventListener('click', () => {
+            openFullscreen(canvas);
+        });
+
+        // --- 3. CANVAS RESIZING LOGIC ---
+        function resizeCanvas() {
+            // Use devicePixelRatio for sharp rendering on high-DPI screens
+            const dpr = window.devicePixelRatio || 1;
+
+            // When in fullscreen, use the screen's dimensions
+            if (document.fullscreenElement) {
+                canvas.width = window.innerWidth * dpr;
+                canvas.height = window.innerHeight * dpr;
+            } else {
+                // Otherwise, use a default size
+                canvas.width = 800 * dpr;
+                canvas.height = 600 * dpr;
+            }
+            
+            // Set the CSS size of the canvas to scale it down to the correct display size
+            // This is crucial for high-DPI rendering
+            canvas.style.width = `${canvas.width / dpr}px`;
+            canvas.style.height = `${canvas.height / dpr}px`;
+
+            // We need to scale the context to match the DPR
+            ctx.scale(dpr, dpr);
+            
+            console.log(`Canvas resized to: ${canvas.width}x${canvas.height} (DPR: ${dpr})`);
+        }
+        
+        // Listen for fullscreen changes to resize the canvas
+        document.addEventListener('fullscreenchange', resizeCanvas);
+        // Also listen for regular window resizes
+        window.addEventListener('resize', resizeCanvas);
+
+
+        // --- 4. GAME LOOP ---
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = ball.color;
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function update() {
+            // Get the display dimensions (unscaled by DPR)
+            const displayWidth = canvas.width / (window.devicePixelRatio || 1);
+            const displayHeight = canvas.height / (window.devicePixelRatio || 1);
+            
+            // Move the ball
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // Wall collision detection (bounce)
+            if (ball.x + ball.radius > displayWidth || ball.x - ball.radius < 0) {
+                ball.dx *= -1; // reverse x direction
+            }
+            if (ball.y + ball.radius > displayHeight || ball.y - ball.radius < 0) {
+                ball.dy *= -1; // reverse y direction
+            }
+        }
+
+        function gameLoop() {
+            // Clear the entire canvas before drawing the next frame
+            // We use the unscaled width/height here
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            update();
+            drawBall();
+
+            // Request the next animation frame
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // --- 5. INITIALIZATION ---
+        // Set the initial size of the canvas
+        resizeCanvas();
+        // Start the game!
+        gameLoop();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connect Four</title>
+    <style>
+        :root {
+            --board-bg: #003366;
+            --cell-size: 8vmin;
+            --p1-color: #ff4136; /* Red */
+            --p2-color: #ffdc00; /* Yellow */
+            --font-color: #333;
+            --bg-color: #f4f4f4;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--font-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--board-bg);
+        }
+
+        #gameStatus {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            min-height: 2rem; /* Prevents layout shift */
+            font-weight: 500;
+        }
+
+        #gameContainer {
+            position: relative;
+        }
+        
+        #columnSelectors {
+            display: flex;
+            position: absolute;
+            width: 100%;
+            top: 0;
+        }
+
+        .selector {
+            height: var(--cell-size);
+            flex-grow: 1;
+            cursor: pointer;
+            border-bottom: 5px solid transparent;
+            transition: border-color 0.2s ease;
+        }
+        
+        .selector:hover {
+            border-bottom-color: var(--p1-color);
+        }
+        
+        body.player-2 .selector:hover {
+             border-bottom-color: var(--p2-color);
+        }
+
+        #gameBoard {
+            display: grid;
+            grid-template-columns: repeat(7, var(--cell-size));
+            grid-template-rows: repeat(6, var(--cell-size));
+            gap: 5px;
+            background-color: var(--board-bg);
+            padding: 10px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: -1;
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background-color: var(--bg-color);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .cell .piece {
+            width: 90%;
+            height: 90%;
+            border-radius: 50%;
+            transform: scale(0);
+            transition: transform 0.3s ease-out;
+        }
+        
+        .cell .piece.dropped {
+            transform: scale(1);
+        }
+
+        .cell.player-1 .piece {
+            background-color: var(--p1-color);
+        }
+
+        .cell.player-2 .piece {
+            background-color: var(--p2-color);
+        }
+        
+        #restartBtn {
+            margin-top: 1.5rem;
+            padding: 12px 25px;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 8px;
+            background-color: var(--board-bg);
+            color: white;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #restartBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Connect Four</h1>
+    <h2 id="gameStatus"></h2>
+    <div id="gameContainer">
+        <div id="columnSelectors"></div>
+        <div id="gameBoard"></div>
+    </div>
+    <button id="restartBtn">Restart Game</button>
+
+    <script>
+        const ROWS = 6;
+        const COLS = 7;
+
+        // --- DOM Elements ---
+        const boardElement = document.getElementById('gameBoard');
+        const selectorsElement = document.getElementById('columnSelectors');
+        const statusElement = document.getElementById('gameStatus');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // --- Game State ---
+        let boardState;
+        let currentPlayer;
+        let gameActive;
+
+        // --- Functions ---
+        
+        function handleColumnClick(colIndex) {
+            if (!gameActive) return;
+
+            // Find the first empty row in the column from the bottom
+            let rowIndex = -1;
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (boardState[r][colIndex] === 0) {
+                    rowIndex = r;
+                    break;
+                }
+            }
+
+            if (rowIndex === -1) {
+                // Column is full
+                return;
+            }
+            
+            // Update state
+            boardState[rowIndex][colIndex] = currentPlayer;
+
+            // Update UI
+            const cell = document.querySelector(`.cell[data-row='${rowIndex}'][data-col='${colIndex}']`);
+            cell.classList.add(`player-${currentPlayer}`);
+            cell.querySelector('.piece').classList.add('dropped');
+
+            // Check for win
+            if (checkForWin(rowIndex, colIndex)) {
+                gameActive = false;
+                statusElement.textContent = `Player ${currentPlayer} wins! 🎉`;
+                document.body.classList.remove(`player-${currentPlayer}`);
+                return;
+            }
+            
+            // Check for draw
+            if (boardState[0].every(cell => cell !== 0)) {
+                gameActive = false;
+                statusElement.textContent = `It's a draw! 🤝`;
+                return;
+            }
+
+            // Switch player
+            switchPlayer();
+        }
+
+        function checkForWin(r, c) {
+            const player = boardState[r][c];
+            
+            // Check in all 4 directions (Horizontal, Vertical, 2 Diagonals)
+            const directions = [
+                { r: 0, c: 1 },  // Horizontal
+                { r: 1, c: 0 },  // Vertical
+                { r: 1, c: 1 },  // Diagonal \
+                { r: 1, c: -1 }  // Diagonal /
+            ];
+
+            for (const dir of directions) {
+                let count = 1; // Count the piece just placed
+                
+                // Count in the positive direction
+                for (let i = 1; i < 4; i++) {
+                    const newR = r + dir.r * i;
+                    const newC = c + dir.c * i;
+                    if (newR >= 0 && newR < ROWS && newC >= 0 && newC < COLS && boardState[newR][newC] === player) {
+                        count++;
+                    } else {
+                        break;
+                    }
+                }
+                
+                // Count in the negative direction
+                for (let i = 1; i < 4; i++) {
+                    const newR = r - dir.r * i;
+                    const newC = c - dir.c * i;
+                    if (newR >= 0 && newR < ROWS && newC >= 0 && newC < COLS && boardState[newR][newC] === player) {
+                        count++;
+                    } else {
+                        break;
+                    }
+                }
+
+                if (count >= 4) return true;
+            }
+            return false;
+        }
+        
+        function switchPlayer() {
+            document.body.classList.remove(`player-${currentPlayer}`);
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            document.body.classList.add(`player-${currentPlayer}`);
+            statusElement.textContent = `Player ${currentPlayer}'s Turn`;
+        }
+
+        function initializeGame() {
+            // Reset state
+            boardState = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+            currentPlayer = 1;
+            gameActive = true;
+
+            // Reset UI
+            boardElement.innerHTML = '';
+            selectorsElement.innerHTML = '';
+            statusElement.textContent = `Player ${currentPlayer}'s Turn`;
+            document.body.className = 'player-1';
+
+            // Create board and selectors
+            for (let c = 0; c < COLS; c++) {
+                const selector = document.createElement('div');
+                selector.classList.add('selector');
+                selector.addEventListener('click', () => handleColumnClick(c));
+                selectorsElement.appendChild(selector);
+            }
+            
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    
+                    const piece = document.createElement('div');
+                    piece.classList.add('piece');
+                    cell.appendChild(piece);
+
+                    boardElement.appendChild(cell);
+                }
+            }
+        }
+        
+        restartBtn.addEventListener('click', initializeGame);
+        
+        // --- Start Game ---
+        initializeGame();
+    </script>
+</body>
+</html>
